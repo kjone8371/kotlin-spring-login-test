@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>회원가입</title>
+    <link href="/static/default-ui.css" rel="stylesheet" />
+</head>
+<body>
+<form class="default-form" method="post" action="/auth/register">
+    <h2 class="center">회원가입</h2>
+    <div th:if="${error != null || msg != null}" th:class="|${error != null ? 'error' : 'okay'} mb-1rem|">
+        <p th:if="error != null" th:text="${error}"/>
+        <p th:if="msg != null" th:text="${msg}"/>
+    </div>
+    <p>
+        <label for="name" class="screenreader">이름</label>
+        <input type="text" id="name" name="name" placeholder="이름" required autofocus>
+    </p>
+    <p>
+        <label for="username" class="screenreader">아이디</label>
+        <input type="text" id="username" name="username" placeholder="아이디" required autofocus>
+    </p>
+    <p>
+        <label for="password" class="screenreader">비밀번호</label>
+        <input type="password" id="password" name="password" placeholder="비밀번호" required>
+    </p>
+    <button type="submit" class="primary">회원가입</button>
+    <p class="center">
+        이미 계정이 있으신가요? <a href="/login">로그인</a>
+    </p>
+</form>
+</body>
+</html>

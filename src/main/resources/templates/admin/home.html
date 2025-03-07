@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>관리자 페이지</title>
+    <link href="/static/default-ui.css" rel="stylesheet"/>
+    <link href="/static/ui.css" rel="stylesheet"/>
+    <link href="/static/table.css" rel="stylesheet"/>
+    <script src="https://momentjs.com/downloads/moment.min.js"></script>
+    <style>
+        #parkingDiv {
+            position: relative;
+            max-width: 60vw;
+        }
+        
+        #parking-roi {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            left: 0;
+            top: 0;
+        }
+    </style>
+    <script th:inline="javascript">
+        window.settlement = /*[[${settlement}]]*/null; // Server-side calculate is not real-time update.
+        // anyway, this is not real payment related, it's just information for user.
+        // so securing this information is not very important.
+
+        function updateTimeAndPrice() {
+            let id, inTime, type;
+            /*[# th:each="parking : ${parkings}"]*//*[# th:if="${parking.getLastEvent() != null}"]*/
+            id = /*[[${parking.getLastEvent().getId()}]]*/null;
+            inTime = /*[[${parking.getLastEvent().getInTime()}]]*/null;
+            type = /*[[${parking.getLastEvent().getCar().getType()}]]*/null;
+
+            updateOne(id, inTime, type);
+            /*[/]*//*[/]*/
+        }
+
+        function updateOne(id, inTime, type) {
+            const timeElem = document.getElementById(`time-${id}`);
+            const priceElem = document.getElementById(`price-${id}`);
+            const inDate = moment(inTime).unix();
+            const diff = moment.utc((moment().utc().unix() - inDate) * 1000); // seconds
+
+            const day = (Number(diff.format("DDD")) - 1);
+            timeElem.innerHTML = `${day === 0 ? '' : `${day}일 `}${diff.format("H시간 m분")}`;
+
+            const basePrice = settlement.defaultPrice + (Math.ceil(moment.duration(diff).as('hour')) - 1) * settlement.additionalPrice;
+            let priceMultiplier;
+            if (type === "ELECTRIC") {
+                priceMultiplier = settlement.electricDiscount;
+            } else if (type === "HANDICAPPED") {
+                priceMultiplier = settlement.handicappedDiscount;
+            } else { // normal
+                priceMultiplier = settlement.normalDiscount;
+            }
+
+            const finalPrice = Math.round(basePrice * (100 - priceMultiplier) / 100);
+
+            priceElem.innerHTML = `${finalPrice}원`;
+        }
+
+        setInterval(() => {
+            updateTimeAndPrice();
+        }, 5000);
+    </script>
+</head>
+<body>
+<div class="full-width center">
+    <div class="container">
+        <div th:if="${error != null || msg != null}" th:class="|${error != null ? 'error' : 'okay'} mb-1rem|">
+            <p th:if="error != null" th:text="${error}"/>
+            <p th:if="msg != null" th:text="${msg}"/>
+        </div>
+        <h1>관리자 메뉴</h1>
+        <h2>유저 관리</h2>
+        <table>
+            <tr>
+                <th>이름</th>
+                <th>승인 여부</th>
+                <th>차량 관리</th>
+                <th>관리자 메뉴</th>
+            </tr>
+            <th:block th:each="user : ${users}" th:with="verified=${user.getRole() != user.getRole().ROLE_CREATED}">
+                <tr>
+                    <td th:text="${user.getMemberName()}"/>
+                    <td th:text="${verified ? 'O' : 'X'}"/>
+                    <td>
+                        <a th:href="|/admin/car/manage?id=${user.getId()}|">관리하기...</a>
+                    </td>
+                    <td>
+                        <a th:if="${!verified}" th:href="|/admin/accept?id=${user.getId()}|">승인</a>
+                        <a th:href="|/admin/deleteUser?id=${user.getId()}|">회원 탈퇴</a>
+                    </td>
+                </tr>
+            </th:block>
+        </table>
+
+        <h2>주차장 지도</h2>
+        <a href="/admin/parking/roiedit">수정</a>
+        <div id="parkingDiv" class="flex grow flex-col mb-2rem">
+            <img src="/static/parking.png" id="parkingImage" alt="주차장 템플릿 이미지"/>
+            <canvas id="parking-roi"></canvas>
+        </div>
+
+
+        <h2>주차장 관리</h2>
+        <table>
+            <tr>
+                <th>No</th>
+                <th>카메라 IP</th>
+                <th>주차 차량</th>
+                <th>주차 금액/시간</th>
+                <th>관리</th>
+            </tr>
+            <th:block th:each="parking : ${parkings}">
+                <tr>
+                    <td rowspan="2" th:text="${parking.getParkingNum()}"></td>
+                    <td rowspan="2">
+                        <span th:if="${parking.getCamera() == null}">카메라가 없음</span>
+                        <span th:if="${parking.getCamera() != null}" th:text="|${parking.getCamera().getUrl()}${parking.getCamera().getRtspPath()}|"></span>
+                    </td>
+                    <td th:if="${parking.getLastEvent() != null}" rowspan="2">
+                        <span class="nowrap" th:text="${parking.getLastEvent().getCar().getCarId()}" />
+                    </td>
+                    <td th:if="${parking.getLastEvent() == null}" colspan="2" rowspan="2">
+                        <span class="nowrap">X</span>
+                    </td>
+                    <td th:if="${parking.getLastEvent() != null}">
+                        <span class="nowrap"
+                              th:id="|time-${parking.getLastEvent().getId()}|">
+                        </span>
+                    </td>
+                    <td rowspan="2">
+                        <div class="flex flex-row gap-1rem center grow">
+                            <a class="nowrap" th:href="|admin/parking/edit?id=${parking.getParkingNum()}|">카메라 재할당</a>
+                            <a class="nowrap" th:if="${parking.getLastEvent() != null}" th:href="|/admin/car/out?car=${parking.getLastEvent().getCar().getCarId()}|">강제 출차</a>
+                            <form th:action="|/admin/parking/${parking.getParkingNum()}|" th:method="delete">
+                                <button class="a-like-button nowrap" type="submit">삭제</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td th:if="${parking.getLastEvent() != null}">
+                        <span class="nowrap" th:id="|price-${parking.getLastEvent().getId()}|"></span>
+                    </td>
+                </tr>
+            </th:block>
+        </table>
+
+        <h2>카메라 관리</h2>
+        <a href="/admin/cam/addform">추가</a>
+        <table>
+            <tr>
+                <th>IP</th>
+                <th>할당 주차장</th>
+                <th>관리</th>
+            </tr>
+            <th:block th:each="cam : ${cams}">
+                <tr>
+                    <td th:text="|${cam.getUrl()}${cam.getRtspPath()}|" />
+                    <td>
+                        <th:block th:each="parking : ${cam.getParkings()}">
+                            <span>
+                                <th:block th:text="${parking.getParkingNum()}"
+                                /><th:block th:if="${!parkingStat.last}"
+                                            th:text="|, |"/>
+                            </span>
+                        </th:block>
+                        <span th:if="${cam.getParkings().isEmpty()}">할당된 주차장이 없습니다.</span>
+                    </td>
+                    <td>
+                        <div class="flex flex-row gap-1rem center">
+                            <a th:href="|/cam/${cam.getCamId()}|" target="_blank">카메라 확인</a>
+                            <form th:action="|/cam/${cam.getCamId()}|" th:method="delete">
+                                <button class="a-like-button" type="submit">삭제</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            </th:block>
+        </table>
+
+        <div class="full-width flex flex-col">
+            <h2>정산표 관리</h2>
+            <table class="mb-1rem">
+                <tr>
+                    <th>요금타입</th>
+                    <th>가격</th>
+                </tr>
+                <tr>
+                    <td>1시간당 기본요금</td>
+                    <td th:text="|${settlement.getDefaultPrice()}원|"></td>
+                </tr>
+                <tr>
+                    <td>시간당 추가요금</td>
+                    <td th:text="|${settlement.getAdditionalPrice()}원|"></td>
+                </tr>
+                <tr>
+                    <td>기본 할인율(%)</td>
+                    <td th:text="|${settlement.getNormalDiscount()}%|"></td>
+                </tr>
+                <tr>
+                    <td>전기차 할인율(%)</td>
+                    <td th:text="|${settlement.getElectricDiscount()}%|"></td>
+                </tr>
+                <tr>
+                    <td>장애인 할인율(%)</td>
+                    <td th:text="|${settlement.getHandicappedDiscount()}%|"></td>
+                </tr>
+            </table>
+            <div class="flex flex-row gap-1rem mb-2rem center">
+                <a href="/admin/settlement/upload">정산표 등록 (엑셀)</a>
+                <a href="/admin/settlement/edit">할인율 수정</a>
+            </div>
+        </div>
+        <a href="/logout">로그아웃</a>
+    </div>
+    <script th:inline="javascript">
+        updateTimeAndPrice();
+        const canvas = document.getElementById("parking-roi");
+        const img = document.getElementById("parkingImage");
+
+        function getScale() {
+            const scaledX = img.naturalWidth / canvas.clientWidth;
+            const scaledY = img.naturalHeight / canvas.clientHeight;
+            return {scaledX, scaledY};
+        }
+        
+        const resizeHook = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            drawPredefinedROI(canvas.getContext("2d"));
+        };
+        window.onresize = resizeHook;
+        window.onload = resizeHook;
+        img.onresize = resizeHook;
+        
+        canvas.onmousedown = ev => {
+            let x, y, w, h, url;
+            const {scaledX, scaledY} = getScale();
+            /*[# th:each="roi : ${parkings}"]*//*[# th:if="${roi.getRegionX() != null}"]*/
+            x = /*[[${roi.getRegionX()}]]*/0;
+            y = /*[[${roi.getRegionY()}]]*/0;
+            w = /*[[${roi.getRegionWidth()}]]*/0;
+            h = /*[[${roi.getRegionHeight()}]]*/0;
+            /*[# th:if="${roi.getCamera() != null}"]*/
+            if (x / scaledX < ev.offsetX && y / scaledY < ev.offsetY && ev.offsetX < (x + w) / scaledX && ev.offsetY < (y + h) / scaledY) {
+                url = `/cam/` + /*[[${roi.getCamera().getCamId()}]]*/null;
+                window.open(url, '_blank').focus();
+            }
+            /*[/]*//*[/]*//*[/]*/
+        }
+
+        function drawPredefinedROI(ctx) {
+            let x, y, w, h, text, mat;
+            const {scaledX, scaledY} = getScale();
+            /*[# th:each="roi : ${parkings}"]*//*[# th:if="${roi.getRegionX() != null}"]*/
+            x = /*[[${roi.getRegionX()}]]*/0;
+            y = /*[[${roi.getRegionY()}]]*/0;
+            w = /*[[${roi.getRegionWidth()}]]*/0;
+            h = /*[[${roi.getRegionHeight()}]]*/0;
+            text = "[[${roi.getParkingNum()}]]";
+            ctx.font = "24px Pretendard";
+            ctx.fillStyle = "#000";
+            mat = ctx.measureText(text);
+            ctx.fillText(text, (x + w / 2) / scaledX - mat.width / 2, (y + h / 2) / scaledY - (mat.actualBoundingBoxAscent + mat.actualBoundingBoxDescent) / 2);
+            /*[# th:if="${roi.getCamera() != null}"]*/
+            mat = ctx.measureText("C");
+            ctx.fillStyle = "#0f0";
+            ctx.fillText("C", (x + w / 2) / scaledX - mat.width / 2, (y + h / 2) / scaledY + (mat.actualBoundingBoxAscent + mat.actualBoundingBoxDescent) / 2);
+            /*[/]*/
+
+
+            drawRect(ctx, x / scaledX, y / scaledY, (x + w) / scaledX, (y + h) / scaledY, "#ff0");
+            /*[/]*//*[/]*/
+        }
+
+        function drawRect(ctx, x, y, x2, y2, color = "#f00") {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x2, y);
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(x, y2);
+            ctx.lineTo(x, y);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+        }
+    </script>
+</div>
+</body>
+</html>

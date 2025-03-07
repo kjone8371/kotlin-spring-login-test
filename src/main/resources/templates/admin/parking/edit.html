@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>관리자 페이지</title>
+    <link href="/static/default-ui.css" rel="stylesheet"/>
+    <link href="/static/ui.css" rel="stylesheet"/>
+    <link href="/static/table.css" rel="stylesheet"/>
+</head>
+<body>
+<div>
+    <h1 class="center">주차장 수정</h1>
+    <span th:if="${parking == null}" th:text="|${id}에 해당하는 주차장을 찾을 수 없습니다.|"></span>
+    <span th:if="${error != null}" th:text="${error}">Static summary</span>
+    <form th:if="${parking != null}" class="default-form" action="#" method="post">
+        <input type="hidden" name="parkingNum" th:value="${id}">
+        <p>
+            <label for="cctv">CCTV 번호</label>
+            <select id="cctv" name="cctv">
+                <option value="">카메라가 없음</option>
+                <th:block th:each="cam : ${cams}">
+                    <option th:value="${cam.getCamId()}" th:text="|${cam.getUrl()}${cam.getRtspPath()}|"/>
+                </th:block>
+            </select>
+        </p>
+        <button type="submit" class="primary">저장</button>
+    </form>
+</div>
+</body>
+</html>

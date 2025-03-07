@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>관리자 페이지 - 정산표 수정</title>
+    <link href="/static/default-ui.css" rel="stylesheet"/>
+    <link href="/static/ui.css" rel="stylesheet"/>
+    <link href="/static/table.css" rel="stylesheet"/>
+</head>
+<body>
+<div class="full-width center">
+    <div class="container full-width">
+        <h1 class="center">정산표 수정</h1>
+        <form class="default-form" method="post" action="#">
+            <span th:if="${error != null}" th:text="${error}">Static summary</span>
+            <p>
+                <label for="defaultPrice">1시간당 기본요금 (원)</label>
+                <input type="text" id="defaultPrice" name="defaultPrice" th:value="${settlement.getDefaultPrice()}" autofocus>
+            </p>
+            <p>
+                <label for="additionalPrice">시간당 추가요금 (원)</label>
+                <input type="text" id="additionalPrice" name="additionalPrice" th:value="${settlement.getAdditionalPrice()}">
+            </p>
+            <p>
+                <label for="normalDiscount">기본 할인율(%)</label>
+                <input type="text" id="normalDiscount" name="normalDiscount" th:value="${settlement.getNormalDiscount()}">
+            </p>
+            <p>
+                <label for="electricDiscount">전기차 할인율(%)</label>
+                <input type="text" id="electricDiscount" name="electricDiscount" th:value="${settlement.getElectricDiscount()}">
+            </p>
+            <p>
+                <label for="handicappedDiscount">장애인 할인율(%)</label>
+                <input type="text" id="handicappedDiscount" name="handicappedDiscount" th:value="${settlement.getHandicappedDiscount()}">
+            </p>
+            <button type="submit" class="primary">수정</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>
